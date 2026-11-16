@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Maze Solver - AI Search Visualizer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="min-h-screen flex flex-col justify-between p-2 sm:p-4">
+
+<header class="max-w-[1440px] w-full mx-auto mb-3 flex flex-wrap items-center justify-between gap-2 bg-[#1c1f29] border border-[#2c3142] px-4 py-2.5 rounded-xl shadow-lg">
+ <div class="flex items-center gap-3">
+  <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center font-extrabold text-white shadow-md">AI</div>
+  <div>
+   <h1 class="text-base sm:text-lg font-bold tracking-tight text-white leading-tight">The Maze Solver <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 ml-1">Fundamentals of AI</span></h1>
+   <p class="text-xs text-slate-400">BFS • DFS • Greedy • A* • Ant Colony Optimization</p>
+  </div>
+ </div>
+ <div id="statusBanner" class="flex-1 min-w-[260px] text-center sm:text-right mono text-xs sm:text-sm font-semibold text-slate-200 bg-[#13151c] px-3 py-2 rounded-lg border border-[#2a2f3f]">Ready — Select an algorithm or drag <span class="text-emerald-400">S</span> to <span class="text-rose-400">G</span></div>
+</header>
+
+<main class="max-w-[1440px] w-full mx-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 mb-3">
+ <div id="canvasContainer" class="lg:col-span-9 bg-[#181a22] border border-[#2c3142] rounded-xl relative overflow-hidden shadow-xl min-h-[420px] sm:min-h-[520px]">
+  <canvas id="mazeCanvas" class="absolute top-0 left-0 rounded-lg cursor-crosshair"></canvas>
+  <div id="toastMsg" class="hidden absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/95 text-amber-300 border border-amber-400/40 px-4 py-2 rounded-full text-xs font-semibold shadow-2xl pointer-events-none z-20"></div>
+ </div>
+
+ <aside class="lg:col-span-3 bg-[#1c1f29] border border-[#2c3142] rounded-xl p-4 flex flex-col justify-between gap-4 shadow-xl">
+  <div>
+   <div class="flex items-center justify-between mb-1">
+    <h2 class="text-lg font-bold text-white">Results</h2>
+    <span id="terrainBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Terrain ON</span>
+   </div>
+   <p id="terrainSub" class="text-xs text-slate-400 mb-3">Grass = 2, Mud = 5, Free = 1</p>
+   <div class="overflow-hidden rounded-lg border border-[#2e3446] bg-[#151720]">
+    <table class="w-full text-left border-collapse">
+     <thead><tr class="text-[11px] uppercase tracking-wider text-slate-400 border-b border-[#2e3446] bg-[#191c26]">
+      <th class="py-2 px-2.5">Algo</th><th class="py-2 px-1.5 text-right">Explored</th><th class="py-2 px-1.5 text-right">Steps</th><th class="py-2 px-1.5 text-right">Cost</th><th class="py-2 px-2.5 text-right">ms</th>
+     </tr></thead>
+     <tbody id="resultsBody" class="mono text-xs divide-y divide-[#252938]"></tbody>
+    </table>
+   </div>
+   <p class="text-[11px] text-slate-400 mt-1.5">Click any completed row to inspect its path.</p>
+  </div>
+
+  <div class="bg-[#151720] border border-[#2a2f3f] rounded-lg p-3">
+   <div class="flex items-center justify-between mb-1">
+    <h3 class="text-sm font-bold text-white">Your Run (Manual Play)</h3>
+    <span class="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">Drag S / Arrows</span>
+   </div>
+   <div id="manualStats" class="text-xs text-slate-400 space-y-1 mt-1.5"></div>
+  </div>
+
+  <div id="extraStatsBox" class="hidden bg-[#151720] border border-[#2a2f3f] rounded-lg p-3 space-y-2">
+   <div id="dynamicInfo" class="hidden flex items-center justify-between text-xs font-semibold text-rose-400">
+    <span>⚔️ Knights: <span id="obsCount">0</span></span><span>Replans: <span id="replanCount">0</span></span>
+   </div>
+   <div id="acoInfo" class="hidden flex items-center justify-between text-xs font-semibold text-cyan-300">
+    <span>🐜 Generation: <span id="acoGen">0</span></span><span>Best Cost: <span id="acoBest">-</span></span>
+   </div>
+   <div id="heatInfo" class="hidden space-y-1">
+    <div class="flex justify-between text-[11px] text-slate-300"><span>Cell Examination Heat</span><span>Peak: <strong id="heatPeak" class="text-amber-300">0x</strong></span></div>
+    <div class="h-2 w-full rounded-full heat-gradient"></div>
+    <div class="flex justify-between text-[10px] text-slate-400"><span>Cold (1x)</span><span>Hot (Max)</span></div>
+   </div>
+  </div>
+
+  <div>
+   <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Legend</h3>
+   <div class="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs text-slate-300">
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-sm bg-[#eceff4] inline-block border border-slate-600"></span> Free (1)</div>
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-sm bg-[#464c5f] inline-block"></span> Wall</div>
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-sm bg-[#b0d678] inline-block"></span> Grass (2)</div>
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-sm bg-[#946846] inline-block"></span> Mud (5)</div>
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-sm bg-[#4682e6]/60 inline-block"></span> Visited</div>
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-sm bg-[#22d3ee]/70 inline-block"></span> Pheromone</div>
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-sm bg-[#ffc83c] inline-block"></span> Path</div>
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-full bg-[#e11d48] inline-block border border-slate-300"></span> Knight ⚔️</div>
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-sm bg-[#2ea05a] inline-block"></span> Start (S)</div>
+    <div class="flex items-center gap-2"><span class="w-3.5 h-3.5 rounded-sm bg-[#dc4646] inline-block"></span> Goal (G)</div>
+   </div>
+  </div>
+ </aside>
+</main>
+
+<footer class="max-w-[1440px] w-full mx-auto bg-[#1c1f29] border border-[#2c3142] rounded-xl p-3 shadow-xl space-y-2.5">
+ <div class="flex flex-wrap items-center gap-2">
+  <button onclick="app.runAlgo('BFS')" id="btn-BFS" class="b1">BFS <i>[B]</i></button>
+  <button onclick="app.runAlgo('DFS')" id="btn-DFS" class="b1">DFS <i>[D]</i></button>
+  <button onclick="app.runAlgo('Greedy')" id="btn-Greedy" class="b1">Greedy <i>[G]</i></button>
+  <button onclick="app.runAlgo('A*')" id="btn-A*" class="b1">A* Search <i>[A]</i></button>
+  <button onclick="app.startACO()" id="btn-ACO" class="b1 c-cyan">🐜 Ant Colony <i>[N]</i></button>
+  <div class="sep hidden sm:block"></div>
+  <button onclick="app.compareAll()" class="b1 c-ind">Compare All <i>[Space]</i></button>
+  <button onclick="app.toggleRace()" id="btn-race" class="b1">Race Mode: OFF <i>[Q]</i></button>
+  <button onclick="app.startRace()" id="btn-restart-race" class="hidden b1 c-am">Restart Race</button>
+  <button onclick="app.openChartModal()" class="b1 c-em">📊 Benchmark Chart</button>
+  <div class="sep hidden sm:block"></div>
+  <button onclick="app.toggleAuto()" id="btn-auto" class="b1">Auto-Play: OFF <i>[P]</i></button>
+  <button onclick="app.toggleHeat()" id="btn-heat" class="b1">Heatmap: OFF <i>[H]</i></button>
+  <button onclick="app.toggleDynamic()" id="btn-dynamic" class="b1">Knights: OFF <i>[O]</i></button>
+ </div>
+ <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[#282d3d]">
+  <div class="flex flex-wrap items-center gap-2">
+   <button onclick="app.cycleMode()" id="btn-mode" class="b2">Maze: Backtracker</button>
+   <button onclick="app.newRandom()" class="b2">New Maze <i>[R]</i></button>
+   <button onclick="app.cycleSize()" id="btn-size" class="b2">Size: 21×33</button>
+   <button onclick="app.toggleTerrain()" id="btn-terrain" class="b2 on">Terrain: ON <i>[T]</i></button>
+   <button onclick="app.cycleBrush()" id="btn-brush" class="b2">Brush: Wall</button>
+   <button onclick="app.clearAll()" class="b2">Clear All <i>[C]</i></button>
+   <button onclick="app.saveMaze()" class="b2">Save JSON</button>
+   <button onclick="document.getElementById('fileInput').click()" class="b2">Load JSON</button>
+   <input type="file" id="fileInput" accept=".json" class="hidden" onchange="app.loadMaze(event)">
+   <button onclick="app.toggleSound()" id="btn-sound" class="b2 on">Sound: ON <i>[M]</i></button>
+  </div>
+  <div class="flex items-center gap-2 bg-[#151720] px-2.5 py-1 rounded-lg border border-slate-700">
+   <span class="text-xs text-slate-400">Speed</span>
+   <button onclick="app.slower()" class="spd">-</button>
+   <span id="speedLabel" class="mono text-xs font-bold text-white w-6 text-center">3</span>
+   <button onclick="app.faster()" class="spd">+</button>
+  </div>
+ </div>
+</footer>
+
+<div id="chartModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+ <div class="bg-[#1c1f29] border border-[#343b50] rounded-2xl max-w-6xl w-full p-5 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+  <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+   <div>
+    <h2 class="text-xl font-bold text-white">Algorithm Performance Benchmark</h2>
+    <p class="text-xs text-slate-400">Averaged across multiple Recursive Backtracker mazes of growing sizes (11×11 to 41×41)</p>
+   </div>
+   <div class="flex items-center gap-2">
+    <button onclick="app.runBenchmarkCharts()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white">Re-run Benchmark</button>
+    <button onclick="app.closeChartModal()" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-semibold text-white">Close [ESC]</button>
+   </div>
+  </div>
+  <div id="chartLoading" class="py-12 text-center text-sm text-amber-300 font-semibold mono">Running live benchmarks across maze sizes... please wait a moment.</div>
+  <div id="chartsGrid" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
+   <div class="bg-[#141720] p-3 rounded-xl border border-slate-800"><canvas id="chartExplored" height="230"></canvas></div>
+   <div class="bg-[#141720] p-3 rounded-xl border border-slate-800"><canvas id="chartTime" height="230"></canvas></div>
+   <div class="bg-[#141720] p-3 rounded-xl border border-slate-800"><canvas id="chartCost" height="230"></canvas></div>
+  </div>
+ </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
